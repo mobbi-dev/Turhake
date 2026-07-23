@@ -40,6 +40,50 @@ pip install -r requirements.txt
 
 Copy `.env.example` to `.env` in the project root
 
+## Commands
+
+### General
+
+- `!commands` - Show public command help
+- `!weather <city>` - Current weather
+- `!weather tomorrow <city>` - Tomorrow's weather
+- `!weather week <city>` - Weekly forecast
+- `!weather hourly <city>` - Hourly forecast
+
+### CS2 / Profiles
+
+- `!cs <team> [count]` - Next CS match(es)
+- `!live <team>` - Live match lookup
+- `!steam <steamid/link>` - Steam profile info
+- `!faceit <steamid/link>` - FACEIT profile info
+
+### HLTV Team Watchlist
+
+- `!team add <name>` - Add a team to watchlist
+- `!team list` - Show tracked teams and aliases
+- `!team remove <name>` - Remove a tracked team by name or alias
+- `!hltvtop` - Hidden admin command to scrape and print the current HLTV top list
+
+## Testing
+
+- Run `pytest` from the project root to validate the formatter and scraper helpers.
+
+## Notes
+
+- HLTV/Steam CS2 updates features use Selenium
+- The bot stores cache files in `cache/`
+- Some commands post their results to dedicated channels instead of the command channel
+
+## Logs Channel
+
+You can disable Discord log channel output with:
+
+```
+LOGS_CHANNEL_ENABLED=false
+```
+
+When disabled, the bot still prints logs to console, but it will not post them to a Discord channel.
+
 ## License
 
 MIT License
