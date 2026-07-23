@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="https://turhake.org/assets/img/logo.png" alt="Turhake logo" width="300">
+</p>
+
 # Turhake Discord Bot
 
-Turhake is a proudly useless Discord bot that somehow manages to provide a few useful features.
+Turhake bot is a proudly useless Discord bot 🤖 It claims to do nothing... and yet mysteriously does quite a few things.
 
 The project is still in its early stages of development. There are almost certainly bugs, rough edges, and questionable design decisions here and there. If you have ideas, find a bug, or notice something that could be improved, pull requests and issue reports are always welcome.
 
