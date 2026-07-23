@@ -1,0 +1,15 @@
+# Core Discord bot
+discord.py
+python-dotenv
+
+# HTTP / web scraping
+aiohttp
+requests
+beautifulsoup4
+selenium
+
+# Optional dependency for Chrome cleanup
+psutil
+
+# Tests
+pytest
