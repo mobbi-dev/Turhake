@@ -18,6 +18,10 @@ from modules.hltv.team_admin import resolve_team_query
 from modules.common import log_to_channel
 
 
+HLTV_SCRAPE_TIMEOUT_SECONDS = 20
+HLTV_SCRAPE_RETRY_DELAY_SECONDS = 3
+
+
 def load_cache():
     # Cache the upcoming matches list to avoid scraping on every lookup
     if HLTV_MATCHES_CACHE_FILE.is_file():
@@ -56,7 +60,7 @@ def get_upcoming_matches_raw():
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".match-wrapper[data-match-wrapper]"))
             )
         except TimeoutException:
-            return []
+            raise TimeoutException("Timed out waiting for HLTV match wrappers")
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         matches = []
@@ -112,9 +116,12 @@ def get_upcoming_matches_raw():
                 "stage": stage,
             })
 
+        if not matches:
+            raise RuntimeError("HLTV scrape returned no matches")
+
         return matches
-    except Exception as e:
-        return []
+    except Exception:
+        raise
     finally:
         if driver:
             driver.quit()
@@ -122,11 +129,25 @@ def get_upcoming_matches_raw():
 
 async def get_upcoming_matches_raw_async():
     # Run the blocking Selenium scrape in a worker thread
-    try:
-        return await asyncio.to_thread(get_upcoming_matches_raw)
-    except Exception as e:
-        await log_to_channel(f"Error in get_upcoming_matches_raw_async: {e}")
-        return []
+    last_error = None
+
+    for attempt in range(2):
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(get_upcoming_matches_raw),
+                timeout=HLTV_SCRAPE_TIMEOUT_SECONDS,
+            )
+        except Exception as e:
+            last_error = e
+            await log_to_channel(
+                f"HLTV scrape failed on attempt {attempt + 1}/2: {type(e).__name__}: {e}"
+            )
+            kill_orphan_chrome(HLTV_SCRAPING_DEBUG_PORT)
+            if attempt == 0:
+                await asyncio.sleep(HLTV_SCRAPE_RETRY_DELAY_SECONDS)
+
+    await log_to_channel(f"HLTV scrape failed after retries: {type(last_error).__name__}: {last_error}")
+    return []
 
 
 async def get_upcoming_matches_async():
