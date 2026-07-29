@@ -107,6 +107,11 @@ class CS2Updates(commands.Cog):
         if not text:
             return text
 
+        if "[" in text and "](" in text:
+            return text
+        if "http://" in text or "https://" in text:
+            return text
+
         # Steam identifiers and dotted names are long; zero-width spaces let Discord wrap them cleanly
         # without changing the visible text
         text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "\u200b", text)
@@ -218,6 +223,27 @@ class CS2Updates(commands.Cog):
 
         blocks = []
 
+        def render_inline(node):
+            if not isinstance(node, Tag):
+                return " ".join(str(node).split())
+
+            name = node.name.lower()
+            if name == "wbr":
+                return ""
+            if name == "a":
+                text = " ".join(node.get_text(" ", strip=True).split())
+                href = node.get("href")
+                if href and text and href != text:
+                    return f"[{self._soft_wrap_text(text)}]({href})"
+                return self._soft_wrap_text(text)
+
+            parts = []
+            for child in node.children:
+                rendered = render_inline(child)
+                if rendered:
+                    parts.append(rendered)
+            return " ".join("".join(parts).split())
+
         def render_list(node, indent=0):
             rendered = []
 
@@ -227,12 +253,11 @@ class CS2Updates(commands.Cog):
                 for child in li.children:
                     if isinstance(child, Tag) and child.name.lower() in {"ul", "ol"}:
                         continue
-                    if isinstance(child, Tag):
-                        text_parts.append(" ".join(child.get_text(" ", strip=True).split()))
-                    elif isinstance(child, str):
-                        text_parts.append(" ".join(child.split()))
+                    inline_text = render_inline(child)
+                    if inline_text:
+                        text_parts.append(inline_text)
 
-                text = " ".join(part for part in text_parts if part).strip()
+                text = " ".join("".join(text_parts).split()).strip()
                 if text:
                     # Preserve Steams nested bullet hierarchy while formatting the text for discord
                     rendered.append(f"{'  ' * indent}• {self._soft_wrap_text(text)}")
@@ -248,7 +273,7 @@ class CS2Updates(commands.Cog):
                 return
             name = node.name.lower()
             if name == "p":
-                text = " ".join(node.get_text(" ", strip=True).split()).strip()
+                text = render_inline(node).strip()
                 if not text or (title and text.lower() == title.lower()):
                     return
                 if text.startswith("[") and text.endswith("]"):

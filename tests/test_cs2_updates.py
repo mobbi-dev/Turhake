@@ -36,6 +36,39 @@ def test_format_article_html_preserves_sections_and_nested_lists():
     assert "  • Explosion shockwave damage now rapidly expands from the center of the explosion instead of being applied instantly." in output
 
 
+def test_format_article_html_preserves_update_notes_links():
+    html = """
+    <div class="EventDetailsBody A_A2B6fTn_MPLlGCmsLtd">
+      <p>[ MAPS ]<wbr></p>
+      <p>Boulder<wbr></p>
+      <ul>
+        <li>
+          <p>Updated to the latest version from the Community Workshop (<a href="https://steamcommunity.com/sharedfiles/filedetails/changelog/3663186989">Update Notes</a>).<wbr></p>
+        </li>
+      </ul>
+      <p>Fachwerk<wbr></p>
+      <ul>
+        <li>
+          <p>Updated to the latest version from the Community Workshop (<a href="https://steamcommunity.com/sharedfiles/filedetails/changelog/3442040035">Update Notes</a>).<wbr></p>
+        </li>
+      </ul>
+      <p>Shelter<wbr></p>
+      <ul>
+        <li>
+          <p>Updated to the latest version from the Community Workshop (<a href="https://steamcommunity.com/sharedfiles/filedetails/changelog/3737179295">Update Notes</a>).<wbr></p>
+        </li>
+      </ul>
+    </div>
+    """
+
+    cog = CS2Updates(bot=None)
+    output = cog._format_article_html(html, title="Counter-Strike 2 Update", limit=2000)
+
+    assert "[Update Notes](https://steamcommunity.com/sharedfiles/filedetails/changelog/3663186989)" in output
+    assert "[Update Notes](https://steamcommunity.com/sharedfiles/filedetails/changelog/3442040035)" in output
+    assert "[Update Notes](https://steamcommunity.com/sharedfiles/filedetails/changelog/3737179295)" in output
+
+
 def test_extract_first_image_from_html_prefers_article_content():
     hero_url = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/730/ss_352666c1949ce3966bd966d6ea5a1afd532257bc.jpg?t=1780435263"
     html = f"""
