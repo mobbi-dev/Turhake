@@ -31,7 +31,11 @@ async def log_to_channel(message: str):
 
     log_channel = bot.get_channel(LOGS_CHANNEL_ID)
     if log_channel:
-        await safe_send(log_channel, message)
+        try:
+            await safe_send(log_channel, message)
+        except Exception as exc:
+            print(f"[WARN] Failed to write log message to channel: {exc}")
+            print(f"[LOG] {message}")
     else:
         print(f"[LOG] {message}")
 
@@ -41,4 +45,7 @@ async def safe_send(target, *args, **kwargs):
         return await target.send(*args, **kwargs)
     except discord.Forbidden:
         print(f"[WARN] Missing send permission for channel: {getattr(target, 'id', 'unknown')}")
+        return None
+    except Exception as exc:
+        print(f"[WARN] Failed to send message to channel {getattr(target, 'id', 'unknown')}: {exc}")
         return None
