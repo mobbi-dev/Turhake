@@ -1,4 +1,5 @@
 import asyncio
+import html as html_lib
 import json
 import re
 import time
@@ -30,6 +31,7 @@ EXCLUDED_TITLE_WORDS = ("esports", "major", "tournament", "sale")
 IMAGE_RE = re.compile(r"https?://\S+\.(?:png|jpg|jpeg|webp)")
 URL_RE = re.compile(r"https?://\S+")
 OG_IMAGE_RE = re.compile(r'<meta property="og:image" content="([^"]+)"')
+META_DESCRIPTION_RE = re.compile(r'<meta\s+(?:property|name)="(?:og:description|Description)"\s+content="([^"]*)"', re.IGNORECASE)
 PATCH_NOTE_PHRASE = "Updated to the latest version from the Community Workshop (Update Notes)."
 
 # Future improvement
@@ -219,7 +221,11 @@ class CS2Updates(commands.Cog):
         soup = BeautifulSoup(html, "html.parser")
         body = soup.select_one(".EventDetailsBody")
         if not body:
-            return None
+            description = soup.select_one('meta[property="og:description"]') or soup.select_one('meta[name="Description"]')
+            if not description:
+                return None
+
+            return self._format_article_text(description.get("content"), title=title, limit=limit)
 
         blocks = []
 
@@ -302,6 +308,41 @@ class CS2Updates(commands.Cog):
             body_text = body_text[: limit - 3].rstrip() + "..."
         return body_text
 
+    def _format_article_text(self, text, title=None, limit=1400):
+        if not text:
+            return None
+
+        blocks = []
+        in_section = False
+        previous_was_section = False
+
+        for raw_line in text.replace("\r", "\n").splitlines():
+            line = " ".join(raw_line.split()).strip()
+            if not line or (title and line.lower() == title.lower()):
+                continue
+
+            if line.startswith("[") and line.endswith("]"):
+                blocks.append(f"**{line}**")
+                in_section = True
+                previous_was_section = True
+                continue
+
+            if previous_was_section and self._is_heading_line(line) and not line.endswith(":"):
+                blocks.append(f"**{line.rstrip(':')}**")
+            elif in_section:
+                blocks.append(f"• {self._soft_wrap_text(line)}")
+            elif self._is_heading_line(line):
+                blocks.append(f"**{line.rstrip(':')}**")
+            else:
+                blocks.append(self._soft_wrap_text(line))
+
+            previous_was_section = False
+
+        body_text = "\n\n".join(blocks)
+        if len(body_text) > limit:
+            body_text = body_text[: limit - 3].rstrip() + "..."
+        return body_text
+
     @staticmethod
     def _article_url(item):
         url = item.get("url")
@@ -326,6 +367,25 @@ class CS2Updates(commands.Cog):
 
         return None
 
+    async def _fetch_meta_description(self, url):
+        async with aiohttp.ClientSession(headers={"User-Agent": "Mozilla/5.0"}) as session:
+            for request_url in (url, f"{url}?l=english"):
+                async with session.get(request_url, timeout=20) as response:
+                    if response.status != 200:
+                        continue
+                    html = await response.text()
+
+                match = META_DESCRIPTION_RE.search(html)
+                if match:
+                    return html_lib.unescape(match.group(1))
+
+                soup = BeautifulSoup(html, "html.parser")
+                description = soup.find("meta", attrs={"property": "og:description"}) or soup.find("meta", attrs={"name": "Description"})
+                if description:
+                    return description.get("content")
+
+        return None
+
     async def _fetch_article_html(self, url):
         return await asyncio.to_thread(self._fetch_article_html_sync, url)
 
@@ -343,16 +403,25 @@ class CS2Updates(commands.Cog):
         url = self._article_url(item)
         contents = item.get("contents") or ""
         is_patch_notes = self._is_patch_notes(item)
-        excerpt = self._clean_content(contents, title=title, limit=1400 if is_patch_notes else 1000)
+        excerpt_limit = 1400 if is_patch_notes else 1000
+        excerpt = self._clean_content(contents, title=title, limit=excerpt_limit)
+        has_structured_excerpt = False
         image_url = None
 
         if url:
+            description = await self._fetch_meta_description(url)
+            meta_excerpt = self._format_article_text(description, title=title, limit=excerpt_limit)
+            if meta_excerpt:
+                excerpt = meta_excerpt
+                has_structured_excerpt = True
+
             # Use the rendered Steam page when available: that's where the section layout lives
             html = await self._fetch_article_html(url)
             if html:
-                html_excerpt = self._format_article_html(html, title=title, limit=1400 if is_patch_notes else 1000)
-                if html_excerpt:
+                html_excerpt = self._format_article_html(html, title=title, limit=excerpt_limit)
+                if html_excerpt and not has_structured_excerpt:
                     excerpt = html_excerpt
+                    has_structured_excerpt = True
 
                 image_url = self._extract_first_image_from_html(html, base_url=url)
 

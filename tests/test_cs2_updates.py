@@ -83,3 +83,41 @@ def test_extract_first_image_from_html_prefers_article_content():
 
     cog = CS2Updates(bot=None)
     assert cog._extract_first_image_from_html(html, base_url="https://store.steampowered.com/news/app/730/view/123") == hero_url
+
+
+def test_format_article_html_falls_back_to_meta_description_sections():
+    html = """
+    <html>
+      <head>
+        <meta property="og:description" content="[ MAPS ]&#10;Cache&#10;Fixed various gaps in map.&#10;Fixed a wallbang spot on B site.&#10;[ MAP SCRIPTING ]&#10;Reworked CSPlayerCamera:">
+      </head>
+      <body><div id="application_root"></div></body>
+    </html>
+    """
+
+    cog = CS2Updates(bot=None)
+    output = cog._format_article_html(html, title="Counter-Strike 2 Update", limit=2000)
+
+    assert "**[ MAPS ]**" in output
+    assert "**Cache**" in output
+    assert "• Fixed various gaps in map." in output
+    assert "• Fixed a wallbang spot on B site." in output
+    assert "**[ MAP SCRIPTING ]**" in output
+    assert "• Reworked CSPlayer\u200bCamera:" in output
+
+
+def test_format_article_text_preserves_meta_description_sections():
+    text = """[ MAPS ]
+Cache
+Fixed various gaps in map.
+Fixed a wallbang spot on B site.
+[ MAP SCRIPTING ]
+Reworked CSPlayerCamera:"""
+
+    cog = CS2Updates(bot=None)
+    output = cog._format_article_text(text, title="Counter-Strike 2 Update", limit=2000)
+
+    assert output.startswith("**[ MAPS ]**\n\n**Cache**")
+    assert "• Fixed various gaps in map." in output
+    assert "**[ MAP SCRIPTING ]**" in output
+    assert "• Reworked CSPlayer\u200bCamera:" in output
